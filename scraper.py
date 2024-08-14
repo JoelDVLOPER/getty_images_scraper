@@ -74,6 +74,18 @@ driver.quit()
 for im in img_url:
     if im.startswith('/'):
         im = url_prefix + '//' + base_url + im
+    elif im.startswith('data:image/'):
+        header, base64_data = im.split(',', 1)
+        file_format = header.split('/')[1].split(';')[0]
+        data = base64.b64decode(base64_data)
+        file_name = f'{file_counter + 1}.{file_format}'
+        file_path = os.path.join(directory, file_name)
+        if not os.path.exists(directory):
+            break
+        with open(file_path, 'wb') as file:
+            file.write(data)
+        file_counter += 1
+        print(f'Downloaded file: {file_name}')
     file_name = im.split('/')[-1] # gets the name of the file so it can be downloaded later
     re = requests.get(im)
     file_path = os.path.join(directory, file_name)
