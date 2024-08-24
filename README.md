@@ -19,3 +19,7 @@ Este proyecto es un scraper de imágenes desarrollado en Python. Permite a los u
   - Maneja la paginación para un scraping continuo.
   - Guarda imágenes localmente en una carpeta deseada.
 
+# NOTE/NOTA:
+- If the images don't come oout in a file extension format, you can just rename it.
+- Si las imagenes no vienen con una extension de archivo, simplemente puedes renonmbrarlas-
+
