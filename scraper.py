@@ -2,16 +2,20 @@ import requests
 from bs4 import BeautifulSoup
 from tkinter import filedialog
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 import tkinter
 import os
-import time
 import validators
-# PARA HACER: tuple
+import time
 
-def sopa(driver_property, parser):
+def sopa(driver_property, parser, stuff):
     soup = BeautifulSoup(driver_property, parser)
-    global img
-    img = soup.find_all('img')
+    global find
+    find = soup.find_all(stuff)
+
+def folder_inexistent(dirs):
+        print('Path does not exist. Created one.')
+        os.makedirs(dirs)
 
 while True:
         url_input =  input('Enter your URL.')
@@ -35,75 +39,77 @@ root = tkinter.Tk()
 root.withdraw() 
 
 while True:
+    global directory
     directory = filedialog.askdirectory()
-    if type(directory) == tuple or not os.path.exists(directory):
-        print('No folder was selected, or folder does not exist.')
+    if type(directory) == tuple:
+        print('No folder was selected.')
+    elif not os.path.exists(directory):
+        folder_inexistent(directory)
+        break
     else:
         break
 
 driver = webdriver.Firefox()
 driver.get(f'{url_prefix}//{base_url}/{relative_url}')
-sopa(driver.page_source, 'html.parser')
 img_url = []
-file_counter = 0
+file_names = []
+file_counter = 0 
 img_counter = 0
 SCROLL_PAUSE_TIME = 2
-last_height = driver.execute_script("return document.body.scrollHeight")
 
 while True:
-    sopa(driver.page_source, 'html.parser')
-    # Scroll down to bottom
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);") 
+    captionsoup  = BeautifulSoup(driver.page_source, 'html.parser')
+    caption = captionsoup.find_all('figcaption')
+    sopa(driver.page_source, 'html.parser', 'img')
+    # Scroll down to bottom)
+    next_page = driver.find_element(By.CSS_SELECTOR, '.Npj3TMjwvq4A76qbyQTN')
+    driver.execute_script("arguments[0].scrollIntoView();", next_page)
     # iterate through website body, find img urls and put them into a list
-    for i in img:
-            if 'src':
-                src = i.get('src')
-                if src not in img_url:
+    for c in caption:
+        file_names.append(c.text)
+    for f in find:
+        if 'src':
+            src = f.get('src')
+            if src is not None and src not in img_url and '.svg' not in src:
                     img_url.append(src)
                     img_counter += 1
     # Wait to load page
     time.sleep(SCROLL_PAUSE_TIME)
     # Calculate new scroll height and compare with last scroll height
-    new_height = driver.execute_script("return document.body.scrollHeight")
     # usually means that the page has no more content to show
-    if new_height == last_height or img_counter >= img_amount:
+    if img_counter >= img_amount:
         break
-    last_height = new_height
+    elif next_page is None:
+        print('No more pages.')
+        break
+    else:
+        driver.execute_script("arguments[0].click();", next_page)
+        time.sleep(4)
 driver.quit()
 
-for im in img_url:
+file_name_tracker = {}
+for im, fig in zip(img_url, file_names):
     if im.startswith('/'):
         im = url_prefix + '//' + base_url + im
-    elif im.startswith('data:image/'):
-        header, base64_data = im.split(',', 1)
-        file_format = header.split('/')[1].split(';')[0]
-        data = base64.b64decode(base64_data)
-        file_name = f'{file_counter + 1}.{file_format}'
-        file_path = os.path.join(directory, file_name)
-        if not os.path.exists(directory):
-            break
-        with open(file_path, 'wb') as file:
-            file.write(data)
-        file_counter += 1
-        print(f'Downloaded file: {file_name}')
-    file_name = im.split('/')[-1] # gets the name of the file so it can be downloaded later
     re = requests.get(im)
-    file_path = os.path.join(directory, file_name)
+    # used for tracking duplicate file names and assigning them a number if it is a duplicate
+    if fig not in file_name_tracker:
+        file_name_tracker[fig] = 1
+        file_path = os.path.join(directory, f'{fig}')
+    else:
+        file_name_tracker[fig] += 1
+        file_path = os.path.join(directory, f'{fig}_{file_name_tracker[fig]}')
     if not os.path.exists(directory):
-        break
-    file_counter += 1
+        folder_inexistent(directory)
     with open(file_path, 'wb') as file:
-        for q in re:
-            file.write(q)
-    print(f'Downloaded file: {file_name}')
+        for images in re:
+            file.write(images)
+    file_counter += 1
+    print(f'Downloaded file: {fig}')
     if file_counter >= img_amount:
         break
 
 if file_counter > 0:
-    print(f'Finished Downloading! \n Total downloaded: {file_counter} files saved at {directory}.')
-elif 0 < file_counter < img_amount:
-    print(f'Finished Downloading!\nFailed to fulfill amount of images asked. \n Total downloaded: {file_counter} files saved at {directory}.')
-elif not os.path.exists(directory):
-    print('Session was interrupted and could not run as intended')
+    print(f'Finished Downloading!\nTotal downloaded: {file_counter} files saved at {directory}.')
 else:
     print('No images were found.')
